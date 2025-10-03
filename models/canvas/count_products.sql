@@ -1,56 +1,80 @@
 WITH stg_orders AS (
-  /* Order data with basic cleaning and transformation applied, one row per order. */
   SELECT
     *
   FROM {{ ref('jaffle_shop', 'stg_orders') }}
 ), stg_order_items AS (
-  /* Individual food and drink items that make up our orders, one row per item. */
   SELECT
     *
   FROM {{ ref('jaffle_shop', 'stg_order_items') }}
 ), stg_customers AS (
-  /* Customer data with basic cleaning and transformation applied, one row per customer. */
   SELECT
     *
   FROM {{ ref('jaffle_shop', 'stg_customers') }}
-), join_on_order_id AS (
+), join_1 AS (
   SELECT
-    stg_orders.ORDER_ID,
-    stg_orders.CUSTOMER_ID,
-    stg_order_items.PRODUCT_ID
+    *
   FROM stg_orders
   JOIN stg_order_items
     USING (ORDER_ID)
-), join_customer_name AS (
+), formula_1 AS (
   SELECT
-    join_on_order_id.ORDER_ID,
-    join_on_order_id.CUSTOMER_ID,
-    stg_customers.CUSTOMER_NAME,
-    join_on_order_id.PRODUCT_ID,
-    stg_customers.CUSTOMER_ID AS CUSTOMER_ID_1
-  FROM join_on_order_id
-  LEFT JOIN stg_customers
-    USING (CUSTOMER_ID)
-), count_product_ids_by_customer AS (
+    *,
+    SPLIT_PART(CUSTOMER_NAME, ' ', 1) AS FIRST_NAME,
+    SPLIT_PART(CUSTOMER_NAME, ' ', 2) AS LAST_NAME
+  FROM stg_customers
+), rename_1 AS (
   SELECT
-    CUSTOMER_NAME,
-    PRODUCT_ID,
-    COUNT(PRODUCT_ID) AS count_PRODUCT_ID
-  FROM join_customer_name
-  GROUP BY
-    CUSTOMER_NAME,
+    ORDER_ID,
+    CUSTOMER_ID,
     PRODUCT_ID
-), order_products_in_decending_order AS (
+  FROM join_1
+), join_2 AS (
   SELECT
     *
-  FROM count_product_ids_by_customer
+  FROM rename_1
+  LEFT JOIN formula_1
+    USING (CUSTOMER_ID)
+), rename_2 AS (
+  SELECT
+    ORDER_ID,
+    CUSTOMER_ID,
+    CUSTOMER_NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    PRODUCT_ID,
+    CUSTOMER_ID AS CUSTOMER_ID_1
+  FROM join_2
+), aggregate_1 AS (
+  SELECT
+    CUSTOMER_NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    PRODUCT_ID,
+    COUNT(PRODUCT_ID) AS COUNT_PRODUCT_ID
+  FROM rename_2
+  GROUP BY
+    CUSTOMER_NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    PRODUCT_ID
+), rename_3 AS (
+  SELECT
+    CUSTOMER_NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    PRODUCT_ID,
+    COUNT_PRODUCT_ID
+  FROM aggregate_1
+), order_1 AS (
+  SELECT
+    *
+  FROM rename_3
   ORDER BY
-    CUSTOMER_NAME ASC,
-    count_PRODUCT_ID DESC
+    COUNT_PRODUCT_ID DESC
 ), count_products_sql AS (
   SELECT
     *
-  FROM order_products_in_decending_order
+  FROM order_1
 )
 SELECT
   *
